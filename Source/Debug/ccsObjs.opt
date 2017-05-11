@@ -1,0 +1,1 @@
+"./DDSExperiment.obj" "./tm4c1294ncpdt_startup_ccs.obj" "../tm4c1294ncpdt.cmd" -llibc.a -l"D:/TI/TivaWare_C_Series-2.1.4.178/driverlib/ccs/Debug/driverlib.lib" 

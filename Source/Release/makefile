@@ -11,6 +11,7 @@ GEN_CMDS__FLAG :=
 
 ORDERED_OBJS += \
 "./DDSExperiment.obj" \
+"./keypad.obj" \
 "./tm4c1294ncpdt_startup_ccs.obj" \
 "../tm4c1294ncpdt.cmd" \
 $(GEN_CMDS__FLAG) \
@@ -154,8 +155,8 @@ DDS_Experiment.hex: $(EXE_OUTPUTS)
 # Other Targets
 clean:
 	-$(RM) $(BIN_OUTPUTS__QUOTED)$(EXE_OUTPUTS__QUOTED)
-	-$(RM) "DDSExperiment.obj" "tm4c1294ncpdt_startup_ccs.obj" 
-	-$(RM) "DDSExperiment.d" "tm4c1294ncpdt_startup_ccs.d" 
+	-$(RM) "DDSExperiment.obj" "keypad.obj" "tm4c1294ncpdt_startup_ccs.obj" 
+	-$(RM) "DDSExperiment.d" "keypad.d" "tm4c1294ncpdt_startup_ccs.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

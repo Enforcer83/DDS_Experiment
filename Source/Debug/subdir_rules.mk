@@ -8,14 +8,21 @@ SHELL = cmd.exe
 DDSExperiment.obj: ../DDSExperiment.c $(GEN_OPTS) | $(GEN_HDRS)
 	@echo 'Building file: $<'
 	@echo 'Invoking: ARM Compiler'
-	"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --include_path="D:/Users/Jacob/workspace_v7/DDS_Experiment" --include_path="D:/TI/TivaWare_C_Series-2.1.4.178" --include_path="D:/Users/Jacob/workspace_v7/DDS_Experiment" --include_path="D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/include" --define=ccs="ccs" --define=PART_TM4C1294NCPDT -g --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi --preproc_with_compile --preproc_dependency="DDSExperiment.d" $(GEN_OPTS__FLAG) "$<"
+	"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --include_path="D:/Users/Jacob/workspace_v7/DDS_Experiment" --include_path="D:/Users/Jacob/Documents/Repo/Library/Programming" --include_path="D:/TI/TivaWare_C_Series-2.1.4.178" --include_path="D:/Users/Jacob/workspace_v7/DDS_Experiment" --include_path="D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/include" --define=ccs="ccs" --define=TARGET_IS_TM4C129_RA0 --define=PART_TM4C1294NCPDT -g --c89 --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi --preproc_with_compile --preproc_dependency="DDSExperiment.d" $(GEN_OPTS__FLAG) "$<"
+	@echo 'Finished building: $<'
+	@echo ' '
+
+keypad.obj: ../keypad.c $(GEN_OPTS) | $(GEN_HDRS)
+	@echo 'Building file: $<'
+	@echo 'Invoking: ARM Compiler'
+	"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --include_path="D:/Users/Jacob/workspace_v7/DDS_Experiment" --include_path="D:/Users/Jacob/Documents/Repo/Library/Programming" --include_path="D:/TI/TivaWare_C_Series-2.1.4.178" --include_path="D:/Users/Jacob/workspace_v7/DDS_Experiment" --include_path="D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/include" --define=ccs="ccs" --define=TARGET_IS_TM4C129_RA0 --define=PART_TM4C1294NCPDT -g --c89 --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi --preproc_with_compile --preproc_dependency="keypad.d" $(GEN_OPTS__FLAG) "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 
 tm4c1294ncpdt_startup_ccs.obj: ../tm4c1294ncpdt_startup_ccs.c $(GEN_OPTS) | $(GEN_HDRS)
 	@echo 'Building file: $<'
 	@echo 'Invoking: ARM Compiler'
-	"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --include_path="D:/Users/Jacob/workspace_v7/DDS_Experiment" --include_path="D:/TI/TivaWare_C_Series-2.1.4.178" --include_path="D:/Users/Jacob/workspace_v7/DDS_Experiment" --include_path="D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/include" --define=ccs="ccs" --define=PART_TM4C1294NCPDT -g --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi --preproc_with_compile --preproc_dependency="tm4c1294ncpdt_startup_ccs.d" $(GEN_OPTS__FLAG) "$<"
+	"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --include_path="D:/Users/Jacob/workspace_v7/DDS_Experiment" --include_path="D:/Users/Jacob/Documents/Repo/Library/Programming" --include_path="D:/TI/TivaWare_C_Series-2.1.4.178" --include_path="D:/Users/Jacob/workspace_v7/DDS_Experiment" --include_path="D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/include" --define=ccs="ccs" --define=TARGET_IS_TM4C129_RA0 --define=PART_TM4C1294NCPDT -g --c89 --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi --preproc_with_compile --preproc_dependency="tm4c1294ncpdt_startup_ccs.d" $(GEN_OPTS__FLAG) "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

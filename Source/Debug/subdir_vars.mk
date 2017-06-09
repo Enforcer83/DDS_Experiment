@@ -10,26 +10,32 @@ CMD_SRCS += \
 
 C_SRCS += \
 ../DDSExperiment.c \
+../keypad.c \
 ../tm4c1294ncpdt_startup_ccs.c 
 
 C_DEPS += \
 ./DDSExperiment.d \
+./keypad.d \
 ./tm4c1294ncpdt_startup_ccs.d 
 
 OBJS += \
 ./DDSExperiment.obj \
+./keypad.obj \
 ./tm4c1294ncpdt_startup_ccs.obj 
 
 OBJS__QUOTED += \
 "DDSExperiment.obj" \
+"keypad.obj" \
 "tm4c1294ncpdt_startup_ccs.obj" 
 
 C_DEPS__QUOTED += \
 "DDSExperiment.d" \
+"keypad.d" \
 "tm4c1294ncpdt_startup_ccs.d" 
 
 C_SRCS__QUOTED += \
 "../DDSExperiment.c" \
+"../keypad.c" \
 "../tm4c1294ncpdt_startup_ccs.c" 
 
 

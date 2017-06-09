@@ -11,6 +11,7 @@ GEN_CMDS__FLAG :=
 
 ORDERED_OBJS += \
 "./DDSExperiment.obj" \
+"./keypad.obj" \
 "./tm4c1294ncpdt_startup_ccs.obj" \
 "../tm4c1294ncpdt.cmd" \
 $(GEN_CMDS__FLAG) \
@@ -142,7 +143,7 @@ all: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 DDS_Experiment.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: ARM Linker'
-	"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --define=ccs="ccs" --define=PART_TM4C1294NCPDT -g --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi -z -m"DDS_Experiment.map" --heap_size=0 --stack_size=512 -i"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/lib" -i"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="DDS_Experiment_linkInfo.xml" --rom_model -o "DDS_Experiment.out" $(ORDERED_OBJS)
+	"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --define=ccs="ccs" --define=TARGET_IS_TM4C129_RA0 --define=PART_TM4C1294NCPDT -g --c89 --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi -z -m"DDS_Experiment.map" --heap_size=0 --stack_size=512 -i"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/lib" -i"D:/TI/ccsv7/tools/compiler/ti-cgt-arm_16.9.2.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="DDS_Experiment_linkInfo.xml" --rom_model -o "DDS_Experiment.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -155,8 +156,8 @@ DDS_Experiment.hex: $(EXE_OUTPUTS)
 # Other Targets
 clean:
 	-$(RM) $(BIN_OUTPUTS__QUOTED)$(EXE_OUTPUTS__QUOTED)
-	-$(RM) "DDSExperiment.obj" "tm4c1294ncpdt_startup_ccs.obj" 
-	-$(RM) "DDSExperiment.d" "tm4c1294ncpdt_startup_ccs.d" 
+	-$(RM) "DDSExperiment.obj" "keypad.obj" "tm4c1294ncpdt_startup_ccs.obj" 
+	-$(RM) "DDSExperiment.d" "keypad.d" "tm4c1294ncpdt_startup_ccs.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

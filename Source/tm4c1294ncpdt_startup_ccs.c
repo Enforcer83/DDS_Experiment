@@ -23,6 +23,8 @@
 //*****************************************************************************
 
 #include <stdint.h>
+#include "inc/hw_nvic.h"
+#include "inc/hw_types.h"
 
 //*****************************************************************************
 //
@@ -194,9 +196,7 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // HIM Consumer IR 0
     IntDefaultHandler,                      // I2C8 Master and Slave
     IntDefaultHandler,                      // I2C9 Master and Slave
-    IntDefaultHandler,                      // GPIO Port T
-    IntDefaultHandler,                      // Fan 1
-    0,                                      // Reserved
+    IntDefaultHandler                       // GPIO Port T
 };
 
 //*****************************************************************************

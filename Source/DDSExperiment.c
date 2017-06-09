@@ -53,10 +53,11 @@
 #include "driverlib/pin_map.h"
 #include "driverlib/interrupt.h"
 #include "driverlib/systick.h"
-#include "driverlib/rom.h"
 #include "driverlib/ssi.h"
 #include "driverlib/fpu.h"
-//#include "driverlib/rom_map.h"
+#include "driverlib/rom.h"
+#include "driverlib/rom_map.h"
+#include "keypad.h"
 //#include  ""
 
 #ifdef __cplusplus
@@ -66,11 +67,14 @@ extern “C”{
 // Defines
 //
 // GPIO Base Defines
+#define PORTC		GPIO_PORTC_AHB_BASE
 #define PORTD		GPIO_PORTD_AHB_BASE
 #define PORTF       GPIO_PORTF_AHB_BASE
 #define PORTK       GPIO_PORTK_BASE
 #define PORTM       GPIO_PORTM_BASE
 #define PORTN       GPIO_PORTN_BASE
+#define PORTP		GPIO_PORTP_BASE
+#define	PORTQ		GPIO_PORTQ_BASE
 
 // GPIO Defines
 #define	LED1		GPIO_PIN_1			// Port N Pin 1	O
@@ -89,10 +93,10 @@ extern “C”{
 #define	NCS_INH2	GPIO_PIN_7			// Port M Pin 7	O
 
 // SSI Defines
-#define	MISO3		GPIO_PIN_0			// Port F Pin 0	SSI3
-#define	MOSI3		GPIO_PIN_1			// Port F Pin 1	SSI3
-#define	NCS			GPIO_PIN_2			// Port F Pin 2	SSI3
-#define	SCLK3		GPIO_PIN_3			// Port F Pin 3	SSI3
+#define	MISO3		GPIO_PIN_3			// Port Q Pin 3	SSI3
+#define	MOSI3		GPIO_PIN_2			// Port Q Pin 2	SSI3
+#define	NCS			GPIO_PIN_1			// Port Q Pin 1	SSI3
+#define	SCLK3		GPIO_PIN_0			// Port Q Pin 0	SSI3
 
 // Miscellaneous Defines
 #define	LHALF		0x0F
@@ -154,8 +158,8 @@ uint32_t SYS_CLK_ACT = 0;					// Actual clock frequency obtained by PLL
 uint32_t DDS_CLK = 75000000;
 
 volatile uint32_t COUNT = 0;					// Stores how many times Interrupt handler called
-volatile uint32_t CURRENT_FREQ = 0; 
-volatile uint32_t CURRENT_PH = 0;
+volatile float CURRENT_FREQ = 0;
+volatile float CURRENT_PH = 0;
 
 //**********************************************************************************************************
 //
@@ -183,123 +187,18 @@ volatile uint32_t CURRENT_PH = 0;
 //
 //**********************************************************************************************************
 
-void SysTickHandler() {
+void SysTickHandler(void);
+uint32_t millis (void);
+void initDDS(void);
+void chgDDS (float fRequested, float phRequested, bool *ddsReg0);
 
-    //
-    // The SysTick Timer is configured as a millisecond timer.  An unsigned 32 bit number will have a
-    // maximum value of 18,446,744,073,709,551,615.  It will take nearly 50 days
-    // (2^32/(1000*60*60*24*365.25)) of constant running to fill this variable.
-    //
-    COUNT++;
-
-}
-
-uint32_t millis () {
-
-    return COUNT;
-
-}
-
-void chgDDS (uint32_t fRequested, uint32_t phRequested, bool *ddsReg0)
+#ifdef DEBUG
+void
+__error__(char *pcFilename, uint32_t ui32Line)
 {
-
-	bool update;
-
-	uint8_t fRegSel = 0x00, phRegSel = 0x00,fData0 = 0x00, fData1 = 0x00, fData2 = 0x00, fData3 = 0x00;
-	uint8_t pData0 = 0x00, pData1 = 0x00;
-	uint32_t freqReg = 0, phaseReg = 0;
-
-	if ((fRequested != CURRENT_FREQ) && (phRequested != CURRENT_PH))
-	{
-		
-		freqReg = round((POW2_28 * fRequested) / DDS_CLK);
-		phaseReg = round((POW2_12 * phRequested) / TWO_PI);
-		CURRENT_FREQ = fRequested;
-		CURRENT_PH = phRequested;
-		update = true;
-	
-	}
-
-	else if ((fRequested != CURRENT_FREQ) && (phRequested == CURRENT_PH))
-	{
-		
-		freqReg = round((POW2_28 * fRequested) / DDS_CLK);
-		phaseReg = round((POW2_12 * CURRENT_PH) / TWO_PI);
-		CURRENT_FREQ = fRequested;
-		update = true;
-		
-	}
-
-	else if ((fRequested == CURRENT_FREQ) && (phRequested != CURRENT_PH))
-	{
-		
-		freqReg = round((POW2_28 * CURRENT_FREQ) / DDS_CLK);
-		phaseReg = round((POW2_12 * phRequested) / TWO_PI);
-		CURRENT_PH = phRequested;
-		update = true;
-		
-	}
-
-	fData0 = ((uint8_t) (freqReg & 0xFF));
-	fData1 = ((uint8_t) ((freqReg >> 8) & 0x3F));
-	fData2 = ((uint8_t) ((freqReg >> 14) & 0xFF));
-	fData3 = ((uint8_t) ((freqReg >> 22) & 0x3F));
-	pData0 = ((uint8_t) (phaseReg & 0xFF));
-	pData1 = ((uint8_t) ((phaseReg >> 8) & 0x0F));
-	
-	if (update)
-	{
-		
-		SSIDisable(SSI3_BASE);
-		SSIAdvModeSet(SSI3_BASE, SSI_ADV_MODE_WRITE);
-		SSIEnable(SSI3_BASE);
-		GPIOPinWrite(PORTM, ALL, DDS0_NCS);			// Select DDS0 Chip Select on MUX
-		GPIOPinWrite(PORTK, ALL, DRST0 | !SLEEP0);		// Place DDS in reset state via pin
-
-		if (*ddsReg0)
-		{
-			
-			SSIDataPut(SSI3_BASE, (0xBF & fData3));	// DDS FREQ1 Register MSB
-			SSIAdvDataPutFrameEnd(SSI3_BASE, fData2);
-			SSIDataPut(SSI3_BASE, (0xBF & fData1));	// DDS FREQ1 Register LSB
-			SSIAdvDataPutFrameEnd(SSI3_BASE, fData0);
-			SSIDataPut(SSI3_BASE, (0xEF & pData1));	// DDS PHASE0 Register
-			SSIAdvDataPutFrameEnd(SSI3_BASE, pData0);
-			*ddsReg0 = false;
-			fRegSel = FSEL0;
-			phRegSel = PSEL0;
-			
-		}
-		
-		else
-		{
-			
-			SSIDataPut(SSI3_BASE, (0x7F & fData3));	// DDS FREQ1 Register MSB
-			SSIAdvDataPutFrameEnd(SSI3_BASE, fData2);
-			SSIDataPut(SSI3_BASE, (0x7F & fData1));	// DDS FREQ1 Register LSB
-			SSIAdvDataPutFrameEnd(SSI3_BASE, fData0);
-			SSIDataPut(SSI3_BASE, (0xCF & pData1));		// DDS PHASE0 Register
-			SSIAdvDataPutFrameEnd(SSI3_BASE, pData0);
-			*ddsReg0 = true;
-			fRegSel = !FSEL0;
-			phRegSel = !PSEL0;
-			
-		}
-		
-		while (SSIBusy(SSI3_BASE))
-		{
-		} 
-		
-		GPIOPinWrite(PORTM, ALL, CSD);		// Deselect DDS0 Chip Select on MUX
-		SSIAdvModeSet(SSI3_BASE, SSI_ADV_MODE_READ_WRITE);
-		GPIOPinWrite(PORTK, ALL, !DRST0 | fRegSel | phRegSel);	// Lift Reset and change Freq/Phase Reg
-		
-		SysCtlDelay(5);					// Delay 15 MCU Clock cycles (125ns @ 120 MHz)
-										// DDS propagation delay is 107 nanoseconds @ 75 MHz
-
-	}
-
+    while(1);
 }
+#endif
 
 void main()
 {
@@ -310,24 +209,15 @@ void main()
     FPUEnable();
     FPULazyStackingEnable();
 
+    extern bool NEW_KEY_PRESSED;
+
     //
     // Local Variables
     //
     const uint32_t MAX_CODE_VGA = 0x00000020, MAX_CODE_VR = 0x000003FF;
     const uint32_t MIN_CODE = 0x00000000;
 
-    uint32_t led1OnTime = 500, led1OffTime = 500, led2OnTime = 100, led2ShortOff = 100, led2LongOff = 700;
-
-    volatile bool led1On = false, led2On = false;
-
-    volatile uint32_t gainCodeVGA_DDS = DDSdB00, gainCodeOut = 0x00000000, led1PreviousMillis = 0;
-    volatile uint32_t led2PreviousMillis = 0, pulse = 0, led1State = LOW, led2State = LOW;
-
-    #ifdef DEBUG
-    volatile rollover = 0;
-
-    volatile uint64_t loop = 0;
-    #endif
+    volatile uint32_t gainCodeVGA_DDS = DDSdB16P, gainCodeOut = 0x00000000;
 
     const float RI = 10000, RF1 = 33000, DIG_VR_FS = 10000, RS = 99.8;
     const float IOUT_MAX = 0.003 * (1023 / 1024);
@@ -340,203 +230,19 @@ void main()
 
     volatile float rF = RF1 + (((gainCodeOut / 1024) * DIG_VR_FS) + 70);
     volatile float gainOut_dB = 20 * logf(rF / RI);
+    volatile float
 
-    //
-    // Use external 25MHz Precision Oscillator to Generate an 120MHz System
-    // Clock using the PLL
-    //
-    SysCtlMOSCConfigSet(SYSCTL_MOSC_HIGHFREQ);
-    SYS_CLK_ACT = SysCtlClockFreqSet(SYSCTL_XTAL_25MHZ | SYSCTL_OSC_MAIN | SYSCTL_USE_PLL |
-                    SYSCTL_CFG_VCO_480, SYS_CLK_REQ);
+    uint32_t led1OnTime = 500, led1OffTime = 500, led2OnTime = 100, led2ShortOff = 100, led2LongOff = 700;
 
-    //
-    // Enable Peripherals
-    //
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOK);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOM);
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPION);
-	
-    //
-    // Configure the SysTick Timer.
-    //
-    SysTickPeriodSet(SYS_CLK_ACT / 1000);
-    SysTickIntRegister(SysTickHandler);
-    SysTickEnable();
-    SysTickIntEnable();
+    volatile bool led1On = false, led2On = false, reg0DDS = true;
 
-    //
-    // Unlock NMI (Direct Register Access)
-    //
-    GPIO_PORTD_AHB_LOCK_R = GPIO_LOCK_KEY_DD;   // Unlock Port D Commit Register
-    GPIO_PORTD_AHB_CR_R = 0x00000080; 			// Allow NMI Pin to Be Written
-    GPIO_PORTD_AHB_LOCK_R = 0x00000000;			// Relock Port D Commit Register
+    volatile uint32_t led1PreviousMillis = 0;
+    volatile uint32_t led2PreviousMillis = 0, pulse = 0, led1State = LOW, led2State = LOW;
 
-    //
-    // Enable GPIO AHB
-    //
-    SysCtlGPIOAHBEnable(SYSCTL_PERIPH_GPIOD);
-    SysCtlGPIOAHBEnable(SYSCTL_PERIPH_GPIOF);
+    volatile uint64_t loop = 0, rollover = 0;
 
-    //
-	// Configure GPIO Type
-	//
-	// Output
-	//
-	GPIOPinTypeGPIOOutput(PORTF, ALL);
-	GPIOPinTypeGPIOOutput(PORTK, ALL);
-	GPIOPinTypeGPIOOutput(PORTM, ALL);
-	GPIOPinTypeGPIOOutput(PORTN, ALL);
-	
-	// Input
-	//
-	GPIOPinTypeGPIOInput(PORTD, ALL);
-
-	//
-	// Set GPIO Direction
-	//
-	// Output
-	//
-	GPIODirModeSet(PORTF, ALL, GPIO_DIR_MODE_OUT);
-	GPIODirModeSet(PORTK, ALL, GPIO_DIR_MODE_OUT);
-	GPIODirModeSet(PORTM, ALL, GPIO_DIR_MODE_OUT);
-	GPIODirModeSet(PORTN, ALL, GPIO_DIR_MODE_OUT);
-
-	// Input
-	//
-	
-
-    //
-	// Configure GPIO Pad Properties
-	//
-	// Standard
-	//
-	GPIOPadConfigSet(PORTD, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
-    GPIOPadConfigSet(PORTF, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
-	GPIOPadConfigSet(PORTK, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
-	GPIOPadConfigSet(PORTM, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
-    GPIOPadConfigSet(PORTN, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
-
-	//
-	// Configure Selected Pins Alternate Function
-	//
-	GPIOPinConfigure(GPIO_PF3_SSI3CLK);
-	GPIOPinConfigure(GPIO_PF2_SSI3FSS);
-	GPIOPinConfigure(GPIO_PF1_SSI3XDAT0);
-	GPIOPinConfigure(GPIO_PF0_SSI3XDAT1);
-
-	//
-	// Select the analog ADC function for selected pins
-	//
-	GPIOPinTypeADC(PORTD, ALL);
-
-	//
-	// Assign Selected Pins to SSI Peripheral
-	//
-	GPIOPinTypeSSI(PORTF, SCLK3 | NCS | MOSI3 | MISO3);
-
-	//
-	// Setup SSI communications.
-	//
-	SSIConfigSetExpClk(SSI3_BASE, SYS_CLK_ACT, SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 2000000, 8);
-	SSIAdvModeSet(SSI3_BASE, SSI_ADV_MODE_WRITE);
-	SSIAdvFrameHoldEnable(SSI3_BASE);
-
-	//
-	// Enable SSI
-	//
-	SSIEnable(SSI3_BASE);
-
-	//
-	// Initialize DDS waveform generators (Place in reset and program Freq0, Freq1, 
-	// Phase0 and Phase1 to 0 
-	//
-	GPIOPinWrite(PORTM, ALL, DDS0_NCS);			// Select DDS0 Chip Select on MUX
-	SSIDataPut(SSI3_BASE, 0x23);				// configures DDS for 2 write words and pin control
-	SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);		// and enabling reset via register
-	GPIOPinWrite(PORTK, ALL, DRST0);			// Place DDS in reset state via hardware
-	SSIDataPut(SSI3_BASE, 0x40);				// DDS FREQ0 Register outputs a frequency of 0 Hz MSB
-	SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
-	SSIDataPut(SSI3_BASE, 0x40);				// DDS FREQ0 Register outputs a frequency of 0 Hz LSB
-	SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
-	SSIDataPut(SSI3_BASE, 0x80);				// DDS FREQ1 Register outputs a frequency of 0 Hz MSB
-	SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
-	SSIDataPut(SSI3_BASE, 0x80);				// DDS FREQ1 Register outputs a frequency of 0 Hz LSB
-	SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
-	SSIDataPut(SSI3_BASE, 0xC0);				// DDS PHASE0 Register set to 0 degrees
-	SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
-	SSIDataPut(SSI3_BASE, 0xE0);				// DDS PHASE1 Register set to 0 degrees
-	SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
-	SSIDataPut(SSI3_BASE, 0x22);				// configures DDS for 2 write words and pin control
-	SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
-	GPIOPinWrite(PORTK, ALL, 0x00);				// Release from Reset
-
-	SysCtlDelay(5);								// Delay 15 MCU Clock cycles (125ns @ 120 MHz)
-												// DDS propagation delay is 107 nanoseconds @ 75 MHz
-	
-	GPIOPinWrite(PORTK, ALL, DRST0 | SLEEP0);	// Place DDS back into reset and
-												// sleep until needed
-
-	//
-	// Wait for the SSI bus to become free before continuing.
-	//
-	while (SSIBusy(SSI3_BASE))
-	{
-	}
-
-	//
-	// Deselect all chip selects.
-	//
-	GPIOPinWrite(PORTM, ALL, CSD);
-
-	//
-	// Select the VGA and change the Gain to 26dB which equates to 16dB gain due to the
-	// 10dB attenuator preceding the inputs to the VGA.
-	//
-	gainCodeVGA_DDS = DDSdB16P;
-	GPIOPinWrite(PORTM, ALL, DDS1_VGA_NCS);
-	SSIDataPut(SSI3_BASE, 0x02);
-	SSIAdvDataPutFrameEnd(SSI3_BASE, gainCodeVGA_DDS);
-
-	//
-	// Wait for the SSI bus to become free before continuing.
-	//
-	while (SSIBusy(SSI3_BASE))
-	{
-	}
-
-	//
-	// Set the output amplification stage to a gain of approximately 10.39dB.  This
-	// will show up as an approximately 3.3 V peak signal when the DDS is operational.  
-	// This will remain true as long as the VGA gain is set for 26dB.
-	//
-	GPIOPinWrite(PORTM, ALL, OUT_GAIN1_NCS);
-	SSIDataPut(SSI3_BASE, 0x01);				// Variable resistor number 1
-	SSIDataPut(SSI3_BASE, 0x00);				// Minimum Gain, value 0 ...
-	SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);	// sent to Variable resistor number 1.
-	SSIDataPut(SSI3_BASE, 0x02);				// Variable resistor number 2
-	SSIDataPut(SSI3_BASE, 0x00); 			// Minimum Gain, value 0 ...
-	SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00); 	// sent to Variable resistor number 2.
-
-	//
-	// Wait for the SSI bus to become free before continuing.
-	//
-	while (SSIBusy(SSI3_BASE))
-	{
-	}
-
-	//
-	// Deselect all chip selects.
-	//
-	GPIOPinWrite(PORTM, ALL, CSD);
-
-	//
-	// Configure SSI3 to receive data instead of just transmitting.
-	//
-	SSIDisable(SSI3_BASE);
-	SSIAdvModeSet(SSI3_BASE, SSI_ADV_MODE_READ_WRITE);
-	SSIEnable(SSI3_BASE);
+    initDDS();
+    initKeypad(PORTP, PORTC);
 
 	//
 	// Enter forever loop
@@ -549,7 +255,6 @@ void main()
         //
         // The below is used for debug only
         //
-        #ifdef DEBUG
         if (loop == 0xFFFFFFFFFFFFFFFF)
         {
 
@@ -564,14 +269,13 @@ void main()
             loop++;
 
          }
-         #endif
 
         if (led1On && (currentMillis - led1PreviousMillis >= led1OnTime))
 		{
 
             led1On = false;
             led1PreviousMillis = currentMillis;
-            ROM_GPIOPinWrite(PORTN, LED1, 0x0);
+            GPIOPinWrite(PORTN, LED1, 0x0);
 
         }
 
@@ -580,7 +284,7 @@ void main()
 
             led1On = true;
             led1PreviousMillis = currentMillis;
-            ROM_GPIOPinWrite(PORTN, LED1, LED1);
+            GPIOPinWrite(PORTN, LED1, LED1);
 
         }
 
@@ -589,7 +293,7 @@ void main()
 
             led2On = false;
             led2PreviousMillis = currentMillis;
-            ROM_GPIOPinWrite(PORTN, LED2, 0x0);
+            GPIOPinWrite(PORTN, LED2, 0x0);
 
         }
 
@@ -599,7 +303,7 @@ void main()
             led2On = false;
             pulse = 0;
             led2PreviousMillis = currentMillis;
-            ROM_GPIOPinWrite(PORTN, LED2, 0x0);
+            GPIOPinWrite(PORTN, LED2, 0x0);
 
         }
 
@@ -609,7 +313,7 @@ void main()
             led2On = true;
             pulse = 1;
             led2PreviousMillis = currentMillis;
-            ROM_GPIOPinWrite(PORTN, LED2, LED2);
+            GPIOPinWrite(PORTN, LED2, LED2);
 
         }
 
@@ -619,9 +323,330 @@ void main()
             led2On = true;
             pulse = 2;
             led2PreviousMillis = currentMillis;
-            ROM_GPIOPinWrite(PORTN, LED2, LED2);
+            GPIOPinWrite(PORTN, LED2, LED2);
 
         }
+
+    }
+
+}
+
+void SysTickHandler()
+{
+
+    //
+    // The SysTick Timer is configured as a millisecond timer.  An unsigned 32 bit number will have a
+    // maximum value of .  It will take nearly 50 days
+    // (2^32/(1000*60*60*24)) of constant running to fill this variable.
+    //
+    COUNT++;
+
+}
+
+uint32_t millis ()
+{
+
+    return COUNT;
+
+}
+
+void initDDS()
+{
+
+    //
+    // Use external 25MHz Precision Oscillator to Generate an 120MHz System
+    // Clock using the PLL
+    //
+    SysCtlMOSCConfigSet(SYSCTL_MOSC_HIGHFREQ);
+    SYS_CLK_ACT = SysCtlClockFreqSet(SYSCTL_XTAL_25MHZ | SYSCTL_OSC_MAIN | SYSCTL_USE_PLL |
+                    SYSCTL_CFG_VCO_480, SYS_CLK_REQ);
+
+    //
+    // Enable Peripherals
+    //
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOC);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOK);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOM);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPION);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOP);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOQ);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_SSI3);
+
+    //
+    // Configure the SysTick Timer.
+    //
+    SysTickPeriodSet(SYS_CLK_ACT / 1000);
+    SysTickIntRegister(SysTickHandler);
+    SysTickEnable();
+    SysTickIntEnable();
+
+    //
+    // Unlock NMI (Direct Register Access)
+    //
+    GPIO_PORTD_AHB_LOCK_R = GPIO_LOCK_KEY_DD;   // Unlock Port D Commit Register
+    GPIO_PORTD_AHB_CR_R = 0x00000080;           // Allow NMI Pin to Be Written
+    GPIO_PORTD_AHB_LOCK_R = 0x00000000;         // Relock Port D Commit Register
+
+    //
+    // Enable GPIO AHB
+    //
+    SysCtlGPIOAHBEnable(SYSCTL_PERIPH_GPIOC);
+    SysCtlGPIOAHBEnable(SYSCTL_PERIPH_GPIOD);
+    SysCtlGPIOAHBEnable(SYSCTL_PERIPH_GPIOF);
+
+    //
+    // Configure GPIO Type
+    //
+    // Output
+    //
+    GPIOPinTypeGPIOOutput(PORTF, ALL);
+    GPIOPinTypeGPIOOutput(PORTK, ALL);
+    GPIOPinTypeGPIOOutput(PORTM, ALL);
+    GPIOPinTypeGPIOOutput(PORTN, ALL);
+
+    // Input
+    //
+
+    //
+    // Set GPIO Direction
+    //
+    // Output
+    //
+    GPIODirModeSet(PORTF, ALL, GPIO_DIR_MODE_OUT);
+    GPIODirModeSet(PORTK, ALL, GPIO_DIR_MODE_OUT);
+    GPIODirModeSet(PORTM, ALL, GPIO_DIR_MODE_OUT);
+    GPIODirModeSet(PORTN, ALL, GPIO_DIR_MODE_OUT);
+
+    // Input
+    //
+
+
+    //
+    // Configure GPIO Pad Properties
+    //
+    // Standard
+    //
+    GPIOPadConfigSet(PORTD, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
+    GPIOPadConfigSet(PORTF, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
+    GPIOPadConfigSet(PORTK, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
+    GPIOPadConfigSet(PORTM, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
+    GPIOPadConfigSet(PORTN, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
+    GPIOPadConfigSet(PORTQ, ALL, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
+
+    GPIOPinWrite(PORTF, GPIO_PIN_4, 0);
+
+    //
+    // Configure Selected Pins Alternate Function
+    //
+    GPIOPinConfigure(GPIO_PQ0_SSI3CLK);
+    GPIOPinConfigure(GPIO_PQ1_SSI3FSS);
+    GPIOPinConfigure(GPIO_PQ2_SSI3XDAT0);
+    GPIOPinConfigure(GPIO_PQ3_SSI3XDAT1);
+
+    //
+    // Select the analog ADC function for selected pins
+    //
+    GPIOPinTypeADC(PORTD, ALL);
+
+    //
+    // Assign Selected Pins to SSI Peripheral
+    //
+    GPIOPinTypeSSI(PORTQ, SCLK3 | NCS | MOSI3 | MISO3);
+
+    //
+    // Setup SSI communications.
+    //
+    SSIConfigSetExpClk(SSI3_BASE, SYS_CLK_ACT, SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 2000000, 8);
+    SSIAdvModeSet(SSI3_BASE, SSI_ADV_MODE_WRITE);
+    SSIAdvFrameHoldEnable(SSI3_BASE);
+
+    //
+    // Enable SSI
+    //
+    SSIEnable(SSI3_BASE);
+
+    //
+    // Initialize DDS waveform generators (Place in reset and program Freq0, Freq1,
+    // Phase0 and Phase1 to 0
+    //
+    GPIOPinWrite(PORTM, ALL, DDS0_NCS);         // Select DDS0 Chip Select on MUX
+    SSIDataPut(SSI3_BASE, 0x23);              // configures DDS for 2 write words and pin control
+    SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);       // and enabling reset via register
+    GPIOPinWrite(PORTK, ALL, DRST0);            // Place DDS in reset state via hardware
+    SSIDataPut(SSI3_BASE, 0x40);              // DDS FREQ0 Register outputs a frequency of 0 Hz MSB
+    SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
+    SSIDataPut(SSI3_BASE, 0x40);                // DDS FREQ0 Register outputs a frequency of 0 Hz LSB
+    SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
+    SSIDataPut(SSI3_BASE, 0x80);                // DDS FREQ1 Register outputs a frequency of 0 Hz MSB
+    SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
+    SSIDataPut(SSI3_BASE, 0x80);                // DDS FREQ1 Register outputs a frequency of 0 Hz LSB
+    SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
+    SSIDataPut(SSI3_BASE, 0xC0);                // DDS PHASE0 Register set to 0 degrees
+    SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
+    SSIDataPut(SSI3_BASE, 0xE0);                // DDS PHASE1 Register set to 0 degrees
+    SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
+    SSIDataPut(SSI3_BASE, 0x22);                // configures DDS for 2 write words and pin control
+    SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);
+    GPIOPinWrite(PORTK, ALL, 0x00);             // Release from Reset
+
+    SysCtlDelay(5);                             // Delay 15 MCU Clock cycles (125ns @ 120 MHz)
+                                                    // DDS propagation delay is 107 nanoseconds @ 75 MHz
+
+    GPIOPinWrite(PORTK, ALL, DRST0 | SLEEP0);   // Place DDS back into reset and
+                                                    // sleep until needed
+
+    //
+    // Wait for the SSI bus to become free before continuing.
+    //
+    while (SSIBusy(SSI3_BASE)){}
+
+    //
+    // Deselect all chip selects.
+    //
+    GPIOPinWrite(PORTM, ALL, CSD);
+
+    //
+    // Select the VGA and change the Gain to 26dB which equates to 16dB gain due to the
+    // 10dB attenuator preceding the inputs to the VGA.
+    //
+    GPIOPinWrite(PORTM, ALL, DDS1_VGA_NCS);
+    SSIDataPut(SSI3_BASE, 0x02);
+    SSIAdvDataPutFrameEnd(SSI3_BASE, DDSdB16P);
+
+    //
+    // Wait for the SSI bus to become free before continuing.
+    //
+    while (SSIBusy(SSI3_BASE)){}
+
+    //
+    // Set the output amplification stage to a gain of approximately 10.39dB.  This
+    // will show up as an approximately 3.3 V peak signal when the DDS is operational.
+    // This will remain true as long as the VGA gain is set for 26dB.
+    //
+    GPIOPinWrite(PORTM, ALL, OUT_GAIN1_NCS);
+    SSIDataPut(SSI3_BASE, 0x01);                // Variable resistor number 1
+    SSIDataPut(SSI3_BASE, 0x00);                // Minimum Gain, value 0 ...
+    SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);     // sent to Variable resistor number 1.
+    SSIDataPut(SSI3_BASE, 0x02);                // Variable resistor number 2
+    SSIDataPut(SSI3_BASE, 0x00);                // Minimum Gain, value 0 ...
+    SSIAdvDataPutFrameEnd(SSI3_BASE, 0x00);     // sent to Variable resistor number 2.
+
+    //
+    // Wait for the SSI bus to become free before continuing.
+    //
+    while (SSIBusy(SSI3_BASE)){}
+
+    //
+    // Deselect all chip selects.
+    //
+    GPIOPinWrite(PORTM, ALL, CSD);
+
+    //
+    // Configure SSI3 to receive data instead of just transmitting.
+    //
+    SSIDisable(SSI3_BASE);
+    SSIAdvModeSet(SSI3_BASE, SSI_ADV_MODE_READ_WRITE);
+    SSIEnable(SSI3_BASE);
+
+}
+
+void chgDDS (float fRequested, float phRequested, bool *ddsReg0)
+{
+
+    bool update;
+
+    uint8_t fRegSel = 0x00, phRegSel = 0x00,fData0 = 0x00, fData1 = 0x00, fData2 = 0x00, fData3 = 0x00;
+    uint8_t pData0 = 0x00, pData1 = 0x00;
+    float freqReg = 0, phaseReg = 0;
+
+    if ((fRequested != CURRENT_FREQ) && (phRequested != CURRENT_PH))
+    {
+
+        freqReg = round((POW2_28 * fRequested) / DDS_CLK);
+        phaseReg = round((POW2_12 * phRequested) / TWO_PI);
+        CURRENT_FREQ = fRequested;
+        CURRENT_PH = phRequested;
+        update = true;
+
+    }
+
+    else if ((fRequested != CURRENT_FREQ) && (phRequested == CURRENT_PH))
+    {
+
+        freqReg = round((POW2_28 * fRequested) / DDS_CLK);
+        phaseReg = round((POW2_12 * CURRENT_PH) / TWO_PI);
+        CURRENT_FREQ = fRequested;
+        update = true;
+
+    }
+
+    else if ((fRequested == CURRENT_FREQ) && (phRequested != CURRENT_PH))
+    {
+
+        freqReg = round((POW2_28 * CURRENT_FREQ) / DDS_CLK);
+        phaseReg = round((POW2_12 * phRequested) / TWO_PI);
+        CURRENT_PH = phRequested;
+        update = true;
+
+    }
+
+    fData0 = ((uint8_t) (freqReg & 0xFF));
+    fData1 = ((uint8_t) ((freqReg >> 8) & 0x3F));
+    fData2 = ((uint8_t) ((freqReg >> 14) & 0xFF));
+    fData3 = ((uint8_t) ((freqReg >> 22) & 0x3F));
+    pData0 = ((uint8_t) (phaseReg & 0xFF));
+    pData1 = ((uint8_t) ((phaseReg >> 8) & 0x0F));
+
+    if (update)
+    {
+
+        SSIDisable(SSI3_BASE);
+        SSIAdvModeSet(SSI3_BASE, SSI_ADV_MODE_WRITE);
+        SSIEnable(SSI3_BASE);
+        GPIOPinWrite(PORTM, ALL, DDS0_NCS);         // Select DDS0 Chip Select on MUX
+        GPIOPinWrite(PORTK, ALL, DRST0 | !SLEEP0);      // Place DDS in reset state via pin
+
+        if (*ddsReg0)
+        {
+
+            SSIDataPut(SSI3_BASE, (0xBF & fData3)); // DDS FREQ1 Register MSB
+            SSIAdvDataPutFrameEnd(SSI3_BASE, fData2);
+            SSIDataPut(SSI3_BASE, (0xBF & fData1)); // DDS FREQ1 Register LSB
+            SSIAdvDataPutFrameEnd(SSI3_BASE, fData0);
+            SSIDataPut(SSI3_BASE, (0xEF & pData1)); // DDS PHASE0 Register
+            SSIAdvDataPutFrameEnd(SSI3_BASE, pData0);
+            *ddsReg0 = false;
+            fRegSel = FSEL0;
+            phRegSel = PSEL0;
+
+        }
+
+        else
+        {
+
+            SSIDataPut(SSI3_BASE, (0x7F & fData3)); // DDS FREQ1 Register MSB
+            SSIAdvDataPutFrameEnd(SSI3_BASE, fData2);
+            SSIDataPut(SSI3_BASE, (0x7F & fData1)); // DDS FREQ1 Register LSB
+            SSIAdvDataPutFrameEnd(SSI3_BASE, fData0);
+            SSIDataPut(SSI3_BASE, (0xCF & pData1));     // DDS PHASE0 Register
+            SSIAdvDataPutFrameEnd(SSI3_BASE, pData0);
+            *ddsReg0 = true;
+            fRegSel = !FSEL0;
+            phRegSel = !PSEL0;
+
+        }
+
+        while (SSIBusy(SSI3_BASE)){}
+
+        GPIOPinWrite(PORTM, ALL, CSD);      // Deselect DDS0 Chip Select on MUX
+        SSIAdvModeSet(SSI3_BASE, SSI_ADV_MODE_READ_WRITE);
+        GPIOPinWrite(PORTK, ALL, !DRST0 | fRegSel | phRegSel);  // Lift Reset and change Freq/Phase Reg
+
+        SysCtlDelay(5);                 // Delay 15 MCU Clock cycles (125ns @ 120 MHz)
+                                        // DDS propagation delay is 107 nanoseconds @ 75 MHz
 
     }
 
